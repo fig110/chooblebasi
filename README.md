@@ -49,3 +49,7 @@ Send JSON: `{"user_id":"u_1","text":"add a blue jacket to my cart"}` and watch t
 - Replace the naive agent router with LangGraph + proper intents.
 - Wire Postgres and vector DB as you flesh out catalog, RAG, and checkout.
 - This repo aims to **unblock the first end-to-end loop** with contracts + bus + async workers.
+
+----------
+# For information on how to run this script read the following:
+scripts\cmd\README.md
