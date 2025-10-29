@@ -1,0 +1,8 @@
+echo .venv/>> .gitignore
+echo __pycache__/>> .gitignore
+echo .pytest_cache/>> .gitignore
+echo *.pyc>> .gitignore
+echo .DS_Store>> .gitignore
+echo .idea/>> .gitignore
+echo .vscode/>> .gitignore
+echo infra/*.data>> .gitignore

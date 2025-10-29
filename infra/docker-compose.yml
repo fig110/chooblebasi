@@ -1,0 +1,24 @@
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_PASSWORD: shopping
+      POSTGRES_USER: shopping
+      POSTGRES_DB: shopping
+    ports:
+      - "5432:5432"
