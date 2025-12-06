@@ -3,7 +3,8 @@
 This repository now contains **two side-by-side implementations**:
 
 1. **Legacy FastAPI/RabbitMQ skeleton** (contracts-first, event-driven) – kept intact for future phases.
-2. **New Django/Telegram monolith (Phase 1)** – the current focus for a Telegram-only AI shopping copilot using Postgres, Redis, and Dramatiq.
+2. **New Django/Telegram monolith (Phase 1)** – the current focus for a Telegram-only AI shopping copilot using Postgres, Redis,
+   and Dramatiq.
 
 ## Repository layout
 
@@ -16,7 +17,8 @@ This repository now contains **two side-by-side implementations**:
 
 ### Prerequisites
 - Python 3.11+
-- Postgres and Redis running locally (or via `make infra-up`). Defaults: `postgres://shopping:shopping@localhost:5432/shopping`, Redis at `redis://localhost:6379/0`.
+- Postgres and Redis running locally (or via `make infra-up`). Defaults: `postgres://shopping:shopping@localhost:5432/shopping`,
+  Redis at `redis://localhost:6379/0`.
 - A Telegram bot token (from BotFather) and a webhook URL you control.
 
 ### Environment
@@ -34,17 +36,14 @@ pip install -r requirements.txt
 make django-migrate
 ```
 
-### Run Django API
+### Run Django API (and Redis/Dramatiq)
 ```bash
-make run-django  # serves on http://0.0.0.0:8080
+make run-django        # serves on http://0.0.0.0:8080
+make run-django-worker # Dramatiq worker (needs Redis running)
 ```
 Health check: `GET http://localhost:8080/healthz/`.
 
-### Run Dramatiq worker
-```bash
-make run-django-worker
-```
-Workers will pick up Telegram messages and call the agent runtime.
+If you need local Redis/Postgres, `make infra-up` will start them via Docker Compose.
 
 ### Configure the Telegram webhook
 Point Telegram to your webhook URL:
@@ -57,9 +56,21 @@ Telegram will POST updates here; the view enqueues `run_agent_turn` and responds
 - Receives Telegram text messages at the webhook.
 - Transforms them into platform-agnostic `MessageIn` DTOs.
 - Enqueues `run_agent_turn` via Dramatiq.
-- Runs a minimal `AgentRuntime` that records the conversation and **echoes** `"You said: <text>"` back to Telegram.
+- Runs an `AgentRuntime` that records the conversation, detects basic shopping intents, and replies via Telegram with product search and cart actions.
 
-This flow lays the groundwork for richer tools (product search, cart, order lookup) in future iterations.
+### How to test product + cart flows quickly
+1. Start Django, Redis, and the Dramatiq worker (see above).
+2. Create a few products (via Django admin or shell):
+   ```bash
+   python services/ai_shop_django/manage.py shell -c "from ai_shop.apps.products.models import Product; Product.objects.create(name='Blue Jacket', price='59.99'); Product.objects.create(name='Sneakers', price='89.00', category='shoes')"
+   ```
+3. Message your Telegram bot:
+   - "show me jackets" → returns product suggestions with IDs.
+   - "add 1" or "add product 1" → adds by product ID.
+   - "what's in my cart?" → displays current cart contents and totals.
+   - "remove 1" → drops the product from your cart.
+
+The same flow works with `curl` by POSTing Telegram-style updates to `/telegram/webhook/<TG_WEBHOOK_SECRET>/`.
 
 ## Legacy FastAPI/RabbitMQ skeleton (unchanged)
 
@@ -78,8 +89,6 @@ The original event-driven starter remains available:
    ```
 3. Health check: `GET http://localhost:8000/healthz`.
 4. WebSocket demo: connect to `ws://localhost:8000/ws/demo-session` and send `{ "user_id": "u_1", "text": "add a blue jacket to my cart" }`.
-
-This stack will be revisited in later phases if we expand beyond the monolith.
 
 ----------
 For information on how to run the legacy scripts read the following: `scripts/cmd/README.md`.
