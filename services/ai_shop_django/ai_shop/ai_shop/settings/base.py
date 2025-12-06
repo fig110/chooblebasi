@@ -16,6 +16,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_dramatiq",
     "ai_shop.apps.core",
+    "ai_shop.apps.products",
+    "ai_shop.apps.orders",
     "ai_shop.apps.agent_core",
     "ai_shop.apps.agent_tasks",
     "ai_shop.apps.integrations.telegram",
