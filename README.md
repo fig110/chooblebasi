@@ -1,55 +1,85 @@
 # AI Shopping Platform v3 — Starter Repo
 
-This is a **minimal, runnable starter** for the event-driven, contracts-first architecture we discussed.
-It favors **practicality** and **clarity**: FastAPI for HTTP/WS services, RabbitMQ for the bus, Redis for working memory/idempotency,
-Postgres for data, and Pydantic models for contracts.
+This repository now contains **two side-by-side implementations**:
 
-> Note: This is a skeleton focused on wiring and contracts. You’ll flesh out business logic, LangGraph flows, and catalog/RAG later.
+1. **Legacy FastAPI/RabbitMQ skeleton** (contracts-first, event-driven) – kept intact for future phases.
+2. **New Django/Telegram monolith (Phase 1)** – the current focus for a Telegram-only AI shopping copilot using Postgres, Redis, and Dramatiq.
 
-## What’s included
-- **Contracts-first** Pydantic models exported to JSON Schema
-- **Gateway (BFF)** with WebSocket streaming & health endpoint
-- **Agent Core** skeleton that routes user input to tool requests and streams replies
-- **Cart Worker** that consumes `tool.request.cart.add_item` and replies with `tool.response.cart.add_item` (idempotent)
-- **GMaaS** stub for async media jobs
-- **Messaging** utils for RabbitMQ (pika)
-- **Infra** via Docker Compose: RabbitMQ, Redis, Postgres
+## Repository layout
 
-## Quick start
+- `services/` – legacy FastAPI services (`gateway`, `agent_core`, `workers`, `gmaas`).
+- `infra/` – Docker Compose for Postgres, Redis, RabbitMQ (supports both stacks).
+- `common/` – shared Pydantic schemas and messaging helpers for the legacy stack.
+- `services/ai_shop_django/` – **new Django project** for the Phase 1 Telegram experience.
 
-1) Start infra:
+## Running the Phase 1 Django + Telegram stack
+
+### Prerequisites
+- Python 3.11+
+- Postgres and Redis running locally (or via `make infra-up`). Defaults: `postgres://shopping:shopping@localhost:5432/shopping`, Redis at `redis://localhost:6379/0`.
+- A Telegram bot token (from BotFather) and a webhook URL you control.
+
+### Environment
+Set these environment variables (e.g., in a `.env` file or inline before commands):
+
+- `DJANGO_SECRET_KEY` – any non-empty string for local dev.
+- `TELEGRAM_BOT_TOKEN` – your bot token from BotFather.
+- `TG_WEBHOOK_SECRET` – an arbitrary secret included in the webhook path (e.g., `my-secret-slug`).
+- `POSTGRES_*` and `REDIS_URL` if you are not using the defaults above.
+- `DJANGO_SETTINGS_MODULE` (optional) – defaults to `ai_shop.settings.local`.
+
+### Setup and migrate
 ```bash
-make infra-up
+pip install -r requirements.txt
+make django-migrate
 ```
 
-2) In separate terminals (or use a process manager), run services:
-
+### Run Django API
 ```bash
-# Terminal A
-make run-gateway
-
-# Terminal B
-make run-agent
-
-# Terminal C
-make run-worker-cart
-
-# Terminal D
-make run-gmaas
+make run-django  # serves on http://0.0.0.0:8080
 ```
+Health check: `GET http://localhost:8080/healthz/`.
 
-3) Hit health checks:
-- Gateway: `GET http://localhost:8000/healthz`
+### Run Dramatiq worker
+```bash
+make run-django-worker
+```
+Workers will pick up Telegram messages and call the agent runtime.
 
-4) Connect a WS client to: `ws://localhost:8000/ws/demo-session`
-Send JSON: `{"user_id":"u_1","text":"add a blue jacket to my cart"}` and watch the flow.
+### Configure the Telegram webhook
+Point Telegram to your webhook URL:
+```
+https://<your-host>/telegram/webhook/<TG_WEBHOOK_SECRET>/
+```
+Telegram will POST updates here; the view enqueues `run_agent_turn` and responds immediately with `{ "ok": true }`.
 
-## Notes
-- Env defaults assume `localhost` for infra.
-- Replace the naive agent router with LangGraph + proper intents.
-- Wire Postgres and vector DB as you flesh out catalog, RAG, and checkout.
-- This repo aims to **unblock the first end-to-end loop** with contracts + bus + async workers.
+### What the vertical slice does today
+- Receives Telegram text messages at the webhook.
+- Transforms them into platform-agnostic `MessageIn` DTOs.
+- Enqueues `run_agent_turn` via Dramatiq.
+- Runs a minimal `AgentRuntime` that records the conversation and **echoes** `"You said: <text>"` back to Telegram.
+
+This flow lays the groundwork for richer tools (product search, cart, order lookup) in future iterations.
+
+## Legacy FastAPI/RabbitMQ skeleton (unchanged)
+
+The original event-driven starter remains available:
+
+1. Start infra:
+   ```bash
+   make infra-up
+   ```
+2. In separate terminals:
+   ```bash
+   make run-gateway
+   make run-agent
+   make run-worker-cart
+   make run-gmaas
+   ```
+3. Health check: `GET http://localhost:8000/healthz`.
+4. WebSocket demo: connect to `ws://localhost:8000/ws/demo-session` and send `{ "user_id": "u_1", "text": "add a blue jacket to my cart" }`.
+
+This stack will be revisited in later phases if we expand beyond the monolith.
 
 ----------
-# For information on how to run this script read the following:
-scripts\cmd\README.md
+For information on how to run the legacy scripts read the following: `scripts/cmd/README.md`.
